@@ -10,7 +10,9 @@ import {
 } from "react-native";
 import { Text } from "react-native-paper";
 import { WebView } from "react-native-webview";
-import { ChevronLeft, Share2, Bookmark, MapPin, Building2, Wand2, Mail, Send, ShieldCheck } from "lucide-react-native";
+import { ChevronLeft, Share2, Bookmark, MapPin, Building2, Wand2, Mail, Send, ShieldCheck, Zap } from "lucide-react-native";
+import { Modal, Portal, Provider } from "react-native-paper";
+import Markdown from "react-native-markdown-display";
 import type { JobRow } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
@@ -23,6 +25,9 @@ export default function JobDetailScreen() {
   const router = useRouter();
   const [job, setJob] = useState<JobRow | null>(null);
   const [pdfUri, setPdfUri] = useState<string | null>(null);
+  const [prepMd, setPrepMd] = useState<string | null>(null);
+  const [prepVisible, setPrepVisible] = useState(false);
+  const [prepLoading, setPrepLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -137,11 +142,29 @@ export default function JobDetailScreen() {
 
           <View style={{ marginTop: 32, backgroundColor: colors.card, padding: 16, borderRadius: 20 }}>
              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <View>
-                   <Text style={{ color: colors.text, fontWeight: "900", fontSize: 16 }}>AI Agent Enabled</Text>
-                   <Text style={{ color: colors.sub, fontSize: 12, marginTop: 2 }}>Ready for custom tailoring and drift generation</Text>
+                <View style={{ flex: 1 }}>
+                   <Text style={{ color: colors.text, fontWeight: "900", fontSize: 16 }}>Interview Preparation</Text>
+                   <Text style={{ color: colors.sub, fontSize: 12, marginTop: 2 }}>Generate AI questions and talking points</Text>
+                   <TouchableOpacity 
+                      onPress={async () => {
+                         try {
+                            setPrepLoading(true);
+                            const { data } = await api.post(`/interview/prep/${encodeURIComponent(jobId)}`);
+                            setPrepMd(data.prep_markdown);
+                            setPrepVisible(true);
+                         } catch (e) {
+                            Alert.alert("Error", "Could not generate prep material.");
+                         } finally {
+                            setPrepLoading(false);
+                         }
+                      }}
+                      style={[styles.smallActionBtn, { backgroundColor: colors.primary + "15", marginTop: 12 }]}
+                   >
+                      <Zap size={16} color={colors.primary} />
+                      <Text style={{ color: colors.primary, fontWeight: "800", marginLeft: 6 }}>{prepLoading ? "Preparing..." : "Coach me for this role"}</Text>
+                   </TouchableOpacity>
                 </View>
-                <View style={{ backgroundColor: "rgba(59, 130, 246, 0.1)", padding: 8, borderRadius: 10 }}>
+                <View style={{ backgroundColor: "rgba(59, 130, 246, 0.1)", padding: 8, borderRadius: 10, marginLeft: 16 }}>
                    <ShieldCheck size={20} color={colors.primary} />
                 </View>
              </View>
@@ -177,6 +200,26 @@ export default function JobDetailScreen() {
              <Text style={{ color: "white", fontSize: 18, fontWeight: "800" }}>Apply with AI Agent</Text>
           </TouchableOpacity>
        </View>
+       <Portal>
+          <Modal 
+             visible={prepVisible} 
+             onDismiss={() => setPrepVisible(false)} 
+             contentContainerStyle={[styles.modal, { backgroundColor: colors.card }]}
+          >
+             <ScrollView>
+                <Text style={{ color: colors.text, fontSize: 24, fontWeight: "900", marginBottom: 20 }}>Interview Prep</Text>
+                <Markdown style={{ 
+                   body: { color: colors.text, fontSize: 16, lineHeight: 24 }, 
+                   heading2: { color: colors.primary, marginTop: 20, fontWeight: "800", fontSize: 18 } 
+                }}>
+                   {prepMd || ""}
+                </Markdown>
+             </ScrollView>
+             <TouchableOpacity onPress={() => setPrepVisible(false)} style={[styles.closeBtn, { backgroundColor: colors.primary }]}>
+                <Text style={{ color: "#FFF", fontWeight: "800" }}>Got it</Text>
+             </TouchableOpacity>
+          </Modal>
+       </Portal>
     </View>
   );
 }
@@ -192,6 +235,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     zIndex: 10
   },
+  reasoningCard: { borderRadius: 20, padding: 20 },
   circleBtn: { 
     width: 44, 
     height: 44, 
@@ -252,5 +296,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 8
+  },
+  smallActionBtn: {
+     flexDirection: "row",
+     alignItems: "center",
+     paddingHorizontal: 12,
+     paddingVertical: 8,
+     borderRadius: 10,
+     alignSelf: "flex-start"
+  },
+  modal: {
+     margin: 20,
+     padding: 24,
+     borderRadius: 32,
+     height: "80%"
+  },
+  closeBtn: {
+     marginTop: 20,
+     paddingVertical: 14,
+     borderRadius: 16,
+     alignItems: "center"
   }
 });

@@ -8,7 +8,8 @@ import {
   StyleSheet,
   View,
   TouchableOpacity,
-  TextInput
+  TextInput,
+  Image
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { 
@@ -49,6 +50,7 @@ export default function FeedScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeFilter, setActiveFilter] = useState<"all" | "high" | "local">("all");
 
   const load = useCallback(async () => {
     const { data } = await api.get<JobRow[]>("/jobs", { params: { limit: 80 } });
@@ -91,10 +93,15 @@ export default function FeedScreen() {
     }
   }
 
-  if (loading) {
+  if (loading && jobs.length === 0) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.bg }]}>
-        <ActivityIndicator color={colors.primary} size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.bg, padding: 20 }}>
+         <View style={{ height: 40, width: "70%", backgroundColor: colors.card, marginTop: insets.top + 20, borderRadius: 12, opacity: 0.5 }} />
+         <View style={{ height: 60, width: "100%", backgroundColor: colors.card, marginTop: 40, borderRadius: 16, opacity: 0.5 }} />
+         <View style={{ height: 40, width: "90%", backgroundColor: colors.card, marginTop: 16, borderRadius: 12, opacity: 0.5 }} />
+         {[1, 2, 3].map(i => (
+            <View key={i} style={{ height: 140, backgroundColor: colors.card, borderRadius: 24, marginTop: 24, opacity: 0.4 }} />
+         ))}
       </View>
     );
   }
@@ -127,29 +134,58 @@ export default function FeedScreen() {
               onChangeText={setSearchQuery}
            />
            <View style={{ width: 1, height: 24, backgroundColor: colors.border, marginHorizontal: 12 }} />
-           <TouchableOpacity onPress={() => {/* Filter logic */}}>
+           <TouchableOpacity onPress={() => {/* More filters */}}>
               <SlidersHorizontal size={20} color={colors.primary} />
            </TouchableOpacity>
         </View>
 
-        <ProgressBar indeterminate visible={discovering} style={{ marginTop: 20, height: 2, borderRadius: 1 }} color={colors.primary} />
+        <View style={styles.chipRow}>
+           <TouchableOpacity 
+              onPress={() => setActiveFilter("all")}
+              style={[styles.chip, activeFilter === "all" ? { backgroundColor: colors.primary } : { borderWidth: 1, borderColor: colors.border }]}
+           >
+              <Text style={{ color: activeFilter === "all" ? "#FFF" : colors.text, fontWeight: "600", fontSize: 13 }}>All Jobs</Text>
+           </TouchableOpacity>
+           <TouchableOpacity 
+              onPress={() => setActiveFilter("high")}
+              style={[styles.chip, activeFilter === "high" ? { backgroundColor: colors.primary } : { borderWidth: 1, borderColor: colors.border }]}
+           >
+              <Zap size={14} color={activeFilter === "high" ? "#FFF" : colors.primary} style={{ marginRight: 6 }} />
+              <Text style={{ color: activeFilter === "high" ? "#FFF" : colors.text, fontWeight: "600", fontSize: 13 }}>High Match</Text>
+           </TouchableOpacity>
+           <TouchableOpacity 
+              onPress={() => setActiveFilter("local")}
+              style={[styles.chip, activeFilter === "local" ? { backgroundColor: colors.primary } : { borderWidth: 1, borderColor: colors.border }]}
+           >
+              <MapPin size={14} color={activeFilter === "local" ? "#FFF" : colors.scoreMid} style={{ marginRight: 6 }} />
+              <Text style={{ color: activeFilter === "local" ? "#FFF" : colors.text, fontWeight: "600", fontSize: 13 }}>In Yerevan</Text>
+           </TouchableOpacity>
+        </View>
+
+        <ProgressBar indeterminate visible={discovering} style={{ marginTop: 10, height: 2, borderRadius: 1 }} color={colors.primary} />
       </Surface>
 
       <FlatList
-        data={jobs.filter(j => 
-            (j.title || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
-            (j.site || "").toLowerCase().includes(searchQuery.toLowerCase())
-        )}
+        data={jobs.filter(j => {
+            const matchesSearch = (j.title || "").toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                 (j.site || "").toLowerCase().includes(searchQuery.toLowerCase());
+            if (!matchesSearch) return false;
+
+            if (activeFilter === "high") return (j.fit_score ?? 0) >= 7;
+            if (activeFilter === "local") return (j.location || "").toLowerCase().includes("yerevan");
+            return true;
+        })}
         keyExtractor={(item) => item.job_id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 120 }}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <View style={{ backgroundColor: colors.card, padding: 20, borderRadius: 30, marginBottom: 20 }}>
-               <Search size={40} color={colors.primary} strokeWidth={2} />
-            </View>
-            <Text variant="titleLarge" style={{ color: colors.text, fontWeight: "800" }}>
-                {searchQuery ? "No results found" : "No matching jobs yet"}
+            <Image 
+                source={{ uri: "file:///Users/habraham1/.gemini/antigravity/brain/52e227b3-cf14-4999-b6b4-e4a81b55467a/empty_jobs_feed_1775078145864.png" }}
+                style={{ width: 280, height: 280, borderRadius: 40 }} 
+            />
+            <Text variant="titleLarge" style={{ color: colors.text, fontWeight: "900", marginTop: 24, fontSize: 22, letterSpacing: -0.5 }}>
+                {searchQuery ? "No matches found" : "Your feed is warming up"}
             </Text>
             <Text variant="bodyMedium" style={{ textAlign: "center", marginTop: 8, color: colors.sub, paddingHorizontal: 20 }}>
                {searchQuery 
@@ -230,4 +266,6 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: "row", alignItems: "center", marginTop: 20 },
   tag: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, marginRight: 8 },
   scoreBadge: { flexDirection: "row", alignItems: "center", paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10 },
+  chipRow: { flexDirection: "row", gap: 8, marginTop: 16, marginBottom: 4 },
+  chip: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 12 },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
   StyleSheet, 
   View, 
@@ -64,11 +64,38 @@ const MOCK_NOTIFS: Notification[] = [
   }
 ];
 
+import { Image } from "react-native";
+import { useAuth } from "../lib/auth";
+
 export default function NotificationsScreen() {
   const { colors, isDark } = useTheme();
+  const { api } = useAuth();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [notifs, setNotifs] = useState(MOCK_NOTIFS);
+  const [notifs, setNotifs] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await api.get("/monitoring/dashboard"); // Reusing dashboard runs
+        const runs = data.pipeline_runs || [];
+        const mapped = runs.map((r: any) => ({
+           id: String(r.id),
+           type: r.stage === "discover+enrich" ? "system" : "match",
+           title: r.stage === "discover+enrich" ? "Discovery Bot Finished" : "Job Scored",
+           body: r.detail || "Bot completed a pipeline run.",
+           time: r.created_at,
+           read: true
+        }));
+        setNotifs(mapped);
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [api]);
 
   const getIcon = (type: string) => {
     switch(type) {
@@ -89,9 +116,9 @@ export default function NotificationsScreen() {
         >
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 20, fontWeight: "900", color: colors.text, letterSpacing: -0.5 }}>Notifications</Text>
+        <Text style={{ fontSize: 20, fontWeight: "900", color: colors.text, letterSpacing: -0.5 }}>Bot Activity</Text>
         <TouchableOpacity style={{ padding: 8 }}>
-           <Text style={{ color: colors.primary, fontWeight: "800" }}>Clear all</Text>
+           <Text style={{ color: colors.primary, fontWeight: "800" }}>Clear</Text>
         </TouchableOpacity>
       </View>
 
@@ -101,9 +128,14 @@ export default function NotificationsScreen() {
         contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}
         ListEmptyComponent={
           <View style={styles.empty}>
-             <Bell size={64} color={colors.sub} strokeWidth={1} />
-             <Text style={{ color: colors.text, fontWeight: "900", fontSize: 20, marginTop: 20 }}>All caught up!</Text>
-             <Text style={{ color: colors.sub, textAlign: "center", marginTop: 8 }}>No new notifications since your last check.</Text>
+             <Image 
+                source={{ uri: "file:///Users/habraham1/.gemini/antigravity/brain/52e227b3-cf14-4999-b6b4-e4a81b55467a/notification_hub_empty_1775078169152.png" }}
+                style={{ width: 280, height: 280, borderRadius: 40 }} 
+             />
+             <Text style={{ color: colors.text, fontWeight: "900", fontSize: 22, marginTop: 24, letterSpacing: -0.5 }}>All caught up!</Text>
+             <Text style={{ color: colors.sub, textAlign: "center", marginTop: 8, fontSize: 15, lineHeight: 22 }}>
+                No active bot signals right now. Run discovery to see new updates here.
+             </Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -113,8 +145,8 @@ export default function NotificationsScreen() {
               styles.notifCard, 
               { 
                 backgroundColor: colors.card,
-                opacity: item.read ? 0.7 : 1,
-                borderColor: item.read ? "transparent" : colors.primary + "33"
+                opacity: 1,
+                borderColor: colors.border
               }
             ]}
           >
@@ -124,10 +156,9 @@ export default function NotificationsScreen() {
              <View style={{ flex: 1, marginLeft: 16 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                    <Text style={{ color: colors.text, fontWeight: "800", fontSize: 16 }}>{item.title}</Text>
-                   {!item.read && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
                 </View>
-                <Text style={{ color: colors.sub, fontSize: 14, marginTop: 4, lineHeight: 20 }}>{item.body}</Text>
-                <Text style={{ color: colors.sub, fontSize: 12, marginTop: 8, fontWeight: "600" }}>{item.time}</Text>
+                <Text style={{ color: colors.sub, fontSize: 14, marginTop: 4, lineHeight: 20 }} numberOfLines={2}>{item.body}</Text>
+                <Text style={{ color: colors.sub, fontSize: 12, marginTop: 8, fontWeight: "600" }}>{item.time.split("T")[0]}</Text>
              </View>
           </TouchableOpacity>
         )}
