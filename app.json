@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "ArmApply",
+    "slug": "armapply",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "armapply",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "extra": {
+      "apiUrl": "http://127.0.0.1:8000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "am.armapply.app"
+    },
+    "android": {
+      "package": "am.armapply.app"
+    },
+    "plugins": ["expo-router"]
+  }
+}
