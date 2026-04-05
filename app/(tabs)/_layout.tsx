@@ -3,10 +3,12 @@ import { useTheme } from "../../lib/theme";
 import React from "react";
 import { Home, Briefcase, FileText, User } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useI18n } from "../../lib/i18n";
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
 
   return (
     <Tabs
@@ -36,28 +38,28 @@ export default function TabLayout() {
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: "Home",
+          title: t("home"),
           tabBarIcon: ({ color }) => <Home size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="feed"
         options={{
-          title: "Jobs",
+          title: t("jobs"),
           tabBarIcon: ({ color }) => <Briefcase size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="applications"
         options={{
-          title: "Applied",
+          title: t("applied"),
           tabBarIcon: ({ color }) => <FileText size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: t("profile"),
           tabBarIcon: ({ color }) => <User size={24} color={color} />,
         }}
       />

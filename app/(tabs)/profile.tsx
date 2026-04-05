@@ -1,25 +1,27 @@
 import * as DocumentPicker from "expo-document-picker";
 import React, { useEffect, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View, ActivityIndicator, KeyboardAvoidingView, Platform, TouchableOpacity } from "react-native";
+import { Alert, ScrollView, View, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { 
-  TextInput, 
-  Button, 
-  Text, 
-  Card, 
-  Avatar, 
-  Surface, 
-} from "react-native-paper";
-import { Upload, ChevronRight, FileText, User as UserIcon, Settings, Zap } from "lucide-react-native";
 import { useRouter } from "expo-router";
+
 import { useAuth } from "../../lib/auth";
 import { useTheme } from "../../lib/theme";
+
+// FSD / Feature Architected Components
+import { ProfileHeader } from "../../components/profile/ProfileHeader";
+import { ProfileResumeCard } from "../../components/profile/ProfileResumeCard";
+import { ProfilePersonalInfo } from "../../components/profile/ProfilePersonalInfo";
+import { ProfileBioSocials } from "../../components/profile/ProfileBioSocials";
+import { ProfileExperience } from "../../components/profile/ProfileExperience";
+import { ProfileSearchPreferences } from "../../components/profile/ProfileSearchPreferences";
+import { useI18n } from "../../lib/i18n";
 
 export default function ProfileScreen() {
   const { colors } = useTheme();
   const { api } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t } = useI18n();
   
   // Personal Info
   const [fullName, setFullName] = useState("");
@@ -138,9 +140,9 @@ export default function ProfileScreen() {
       setLoading(true);
       await api.post("/profile/resume-pdf", form, { headers: { "Content-Type": "multipart/form-data" } });
       setHasCv(true);
-      Alert.alert("Success", "CV file updated.");
+      Alert.alert(t("success"), t("cvUpdated"));
     } catch (e: any) {
-      Alert.alert("Error", String(e.response?.data?.detail || e.message));
+      Alert.alert(t("error"), String(e.response?.data?.detail || e.message));
     } finally {
       setLoading(false);
     }
@@ -151,21 +153,27 @@ export default function ProfileScreen() {
       setLoading(true);
       const { data } = await api.post("/profile/auto-fill-from-resume");
       const p = data.profile?.personal || {};
-      setFullName(p.full_name || fullName);
-      setRoleTitle(p.role_title || roleTitle);
-      setEmail(p.email || email);
-      setPhone(p.phone || phone);
-      setBio(p.bio || bio);
-      setSkills(p.skills || skills);
-      setExperience(p.work_experience_text || experience);
-      setEducation(p.education_text || education);
-      setLinks(p.links_text || links);
-      setGithubUrl(p.github_url || githubUrl);
-      setLinkedinUrl(p.linkedin_url || linkedinUrl);
-      setLanguages(p.languages || languages);
-      Alert.alert("Success", "Profile updated with AI extraction results.");
+      
+      if (!p.full_name && !p.email && !p.skills && !p.work_experience_text) {
+         Alert.alert(t("extractionFailed"), t("extractionFailedDesc"));
+         return;
+      }
+
+      setFullName(prev => p.full_name || prev);
+      setRoleTitle(prev => p.role_title || prev);
+      setEmail(prev => p.email || prev);
+      setPhone(prev => p.phone || prev);
+      setBio(prev => p.bio || prev);
+      setSkills(prev => p.skills || prev);
+      setExperience(prev => p.work_experience_text || prev);
+      setEducation(prev => p.education_text || prev);
+      setLinks(prev => p.links_text || prev);
+      setGithubUrl(prev => p.github_url || prev);
+      setLinkedinUrl(prev => p.linkedin_url || prev);
+      setLanguages(prev => p.languages || prev);
+      Alert.alert(t("success"), t("profileUpdatedAI"));
     } catch (e: any) {
-      Alert.alert("Error", String(e.response?.data?.detail || e.message));
+      Alert.alert(t("error"), String(e.response?.data?.detail || e.message));
     } finally {
       setLoading(false);
     }
@@ -177,248 +185,57 @@ export default function ProfileScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: 20, paddingTop: insets.top + 10, paddingBottom: insets.bottom + 100 }}>
-      
-      <View style={{ alignItems: "center", marginTop: 24, marginBottom: 40 }}>
-         <View style={styles.avatarWrapper}>
-            <View style={[styles.avatarGlow, { backgroundColor: colors.primary }]} />
-            <View style={[styles.avatarBox, { backgroundColor: colors.card, borderColor: colors.primary }]}>
-               <UserIcon size={58} color={colors.primary} strokeWidth={2} />
-            </View>
-            <TouchableOpacity 
-               onPress={() => router.push("/settings")} 
-               activeOpacity={0.8}
-               style={[styles.settingsBtnFloating, { backgroundColor: colors.card, borderColor: colors.border }]}
-            >
-               <Settings size={18} color={colors.text} />
-            </TouchableOpacity>
-         </View>
-         
-         <Text style={{ color: colors.text, fontSize: 32, fontWeight: "900", marginTop: 20, letterSpacing: -1 }}>
-            {fullName || "Job Seeker"}
-         </Text>
-         <View style={[styles.roleBadge, { backgroundColor: colors.primary + "15" }]}>
-            <Text style={{ color: colors.primary, fontWeight: "800", fontSize: 13, textTransform: "uppercase" }}>
-               {roleTitle || "Unset Role"}
-            </Text>
-         </View>
-         <Text style={{ color: colors.sub, fontSize: 15, marginTop: 8, opacity: 0.8 }}>{email || "Complete your profile"}</Text>
-      </View>
+      <ScrollView 
+        style={{ flex: 1, backgroundColor: colors.bg }} 
+        contentContainerStyle={{ padding: 20, paddingTop: insets.top + 10, paddingBottom: insets.bottom + 100 }}
+      >
+        <ProfileHeader 
+          fullName={fullName} 
+          roleTitle={roleTitle} 
+          email={email} 
+          colors={colors} 
+          router={router} 
+        />
+        
+        <ProfileResumeCard 
+          hasCv={hasCv} 
+          loading={loading} 
+          colors={colors} 
+          autoFill={autoFill} 
+          pickPdf={pickPdf} 
+        />
+        
+        <ProfilePersonalInfo 
+          fullName={fullName} setFullName={setFullName}
+          roleTitle={roleTitle} setRoleTitle={setRoleTitle}
+          email={email} setEmail={setEmail}
+          phone={phone} setPhone={setPhone}
+          languages={languages} setLanguages={setLanguages}
+          colors={colors}
+        />
+        
+        <ProfileBioSocials 
+          bio={bio} setBio={setBio}
+          githubUrl={githubUrl} setGithubUrl={setGithubUrl}
+          linkedinUrl={linkedinUrl} setLinkedinUrl={setLinkedinUrl}
+          colors={colors}
+        />
+        
+        <ProfileExperience 
+          skills={skills} setSkills={setSkills}
+          experience={experience} setExperience={setExperience}
+          education={education} setEducation={setEducation}
+          links={links} setLinks={setLinks}
+          colors={colors}
+        />
+        
+        <ProfileSearchPreferences 
+          targetRoles={targetRoles} setTargetRoles={setTargetRoles}
+          targetLocation={targetLocation} setTargetLocation={setTargetLocation}
+          colors={colors}
+        />
 
-      <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
-         <View style={{ padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-               <View style={[styles.iconSurface, { backgroundColor: hasCv ? "rgba(16, 185, 129, 0.15)" : "rgba(248, 113, 113, 0.15)" }]}>
-                  <FileText size={24} color={hasCv ? "#10b981" : "#f87171"} />
-               </View>
-               <View style={{ marginLeft: 16 }}>
-                  <Text style={{ color: colors.text, fontWeight: "bold", fontSize: 16 }}>CV / Resume</Text>
-                  <Text style={{ color: colors.sub, marginTop: 4 }}>{hasCv ? "PDF Active" : "No file uploaded"}</Text>
-               </View>
-            </View>
-            <View style={{ flexDirection: "row", gap: 8 }}>
-               {hasCv && (
-                  <TouchableOpacity onPress={autoFill} disabled={loading} style={[styles.scanBtn, { backgroundColor: colors.bg, borderColor: colors.primary, borderWidth: 1 }]}>
-                    <Zap size={16} color={colors.primary} />
-                    <Text style={{ color: colors.primary, fontWeight: "bold", marginLeft: 4 }}>Scan CV</Text>
-                  </TouchableOpacity>
-               )}
-               <TouchableOpacity onPress={pickPdf} style={[styles.uploadBtn, { backgroundColor: colors.primary }]}>
-                  <Upload size={16} color="#FFF" />
-                  <Text style={{ color: "#FFF", fontWeight: "bold", marginLeft: 4 }}>Upload</Text>
-               </TouchableOpacity>
-            </View>
-          </View>
-      </Card>
-
-      <View style={styles.sectionHeader}>
-        <Text variant="titleMedium" style={{ fontWeight: "800", color: colors.text }}>Personal Information</Text>
-      </View>
-
-      <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
-        <Card.Content style={{ gap: 16, marginTop: 12 }}>
-          <TextInput 
-            label="Full Name" 
-            mode="outlined" 
-            value={fullName} 
-            onChangeText={setFullName}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="Professional Role" 
-            mode="outlined" 
-            value={roleTitle} 
-            onChangeText={setRoleTitle}
-            textColor={colors.text}
-            placeholder="e.g. Senior Frontend Engineer"
-            placeholderTextColor={colors.sub}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="Email Address" 
-            mode="outlined" 
-            value={email} 
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="Phone Number" 
-            mode="outlined" 
-            value={phone} 
-            onChangeText={setPhone}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="Languages" 
-            mode="outlined" 
-            value={languages} 
-            onChangeText={setLanguages}
-            textColor={colors.text}
-            placeholder="e.g. Armenian (Native), English (Fluent)"
-            placeholderTextColor={colors.sub}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-        </Card.Content>
-      </Card>
-
-      <View style={styles.sectionHeader}>
-        <Text variant="titleMedium" style={{ fontWeight: "800", color: colors.text }}>Professional Bio & Socials</Text>
-      </View>
-
-      <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
-        <Card.Content style={{ gap: 16, marginTop: 12 }}>
-          <TextInput 
-            label="Professional Summary" 
-            mode="outlined" 
-            value={bio} 
-            onChangeText={setBio}
-            multiline
-            numberOfLines={4}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="GitHub URL" 
-            mode="outlined" 
-            value={githubUrl} 
-            onChangeText={setGithubUrl}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="LinkedIn URL" 
-            mode="outlined" 
-            value={linkedinUrl} 
-            onChangeText={setLinkedinUrl}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-        </Card.Content>
-      </Card>
-
-      <View style={styles.sectionHeader}>
-        <Text variant="titleMedium" style={{ fontWeight: "800", color: colors.text }}>Professional Experience</Text>
-      </View>
-
-      <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
-        <Card.Content style={{ gap: 16, marginTop: 12 }}>
-          <TextInput 
-            label="Skills (comma separated)" 
-            mode="outlined" 
-            value={skills} 
-            onChangeText={setSkills}
-            multiline
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="Work Experience Summary" 
-            mode="outlined" 
-            value={experience} 
-            onChangeText={setExperience}
-            multiline
-            numberOfLines={4}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-           <TextInput 
-            label="Education" 
-            mode="outlined" 
-            value={education} 
-            onChangeText={setEducation}
-            multiline
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="Portfolio / Other Links" 
-            mode="outlined" 
-            value={links} 
-            onChangeText={setLinks}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-        </Card.Content>
-      </Card>
-
-      <View style={styles.sectionHeader}>
-        <Text variant="titleMedium" style={{ fontWeight: "800", color: colors.text }}>Search Preferences</Text>
-      </View>
-
-      <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
-        <Card.Content style={{ gap: 16, marginTop: 12 }}>
-          <TextInput 
-            label="Target Roles (comma separated)" 
-            mode="outlined" 
-            value={targetRoles} 
-            onChangeText={setTargetRoles}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-          <TextInput 
-            label="Target Location" 
-            mode="outlined" 
-            value={targetLocation} 
-            onChangeText={setTargetLocation}
-            textColor={colors.text}
-            style={{ backgroundColor: colors.card }}
-            theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
-          />
-        </Card.Content>
-      </Card>
-
-    </ScrollView>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  avatarWrapper: { position: "relative", width: 120, height: 120, alignItems: "center", justifyContent: "center" },
-  avatarGlow: { position: "absolute", width: 130, height: 130, borderRadius: 65, opacity: 0.1 },
-  avatarBox: { width: 110, height: 110, borderRadius: 36, borderWidth: 2, alignItems: "center", justifyContent: "center", elevation: 10, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: { width: 0, height: 8 } },
-  settingsBtnFloating: { position: "absolute", bottom: -4, right: -4, width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center", elevation: 4 },
-  roleBadge: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 12, marginTop: 12 },
-  sectionHeader: { marginTop: 40, marginBottom: 16, paddingHorizontal: 4 },
-  card: { borderRadius: 24, overflow: "hidden", elevation: 4, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
-  iconSurface: { width: 50, height: 50, borderRadius: 16, alignItems: "center", justifyContent: "center" },
-  uploadBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, elevation: 2 },
-  scanBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16 },
-  saveBtn: { marginTop: 40, paddingVertical: 10, borderRadius: 16, elevation: 0 },
-});

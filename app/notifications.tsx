@@ -66,10 +66,12 @@ const MOCK_NOTIFS: Notification[] = [
 
 import { Image } from "react-native";
 import { useAuth } from "../lib/auth";
+import { useI18n } from "../lib/i18n";
 
 export default function NotificationsScreen() {
   const { colors, isDark } = useTheme();
   const { api } = useAuth();
+  const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [notifs, setNotifs] = useState<Notification[]>([]);
@@ -80,14 +82,46 @@ export default function NotificationsScreen() {
       try {
         const { data } = await api.get("/monitoring/dashboard"); // Reusing dashboard runs
         const runs = data.pipeline_runs || [];
-        const mapped = runs.map((r: any) => ({
-           id: String(r.id),
-           type: r.stage === "discover+enrich" ? "system" : "match",
-           title: r.stage === "discover+enrich" ? "Discovery Bot Finished" : "Job Scored",
-           body: r.detail || "Bot completed a pipeline run.",
-           time: r.created_at,
-           read: true
-        }));
+        const mapped = runs.map((r: any) => {
+           let type = "system";
+           let title = t("sysUpdate");
+           let body = t("botCompletedTask");
+           
+           if (r.stage === "discover+enrich") {
+              title = t("discScanDone");
+              body = t("checkedRolesArmenia");
+              try {
+                 const p = JSON.parse(r.detail);
+                 const c = p?.supabase_sync?.new || 0;
+                 if (c > 0) {
+                    type = "match";
+                    title = t("newJobsDiscovered");
+                    body = t("botFoundN", { n: c });
+                 }
+              } catch(e) {}
+           } else if (r.stage === "score") {
+              title = t("aiScoringDone");
+              type = "match";
+              try {
+                 const p = JSON.parse(r.detail);
+                 const scored = p?.scored || 0;
+                 if (scored > 0) body = t("evalScoredN", { n: scored });
+              } catch(e) {}
+           } else if (r.stage === "apply") {
+              title = t("applySubmitted");
+              type = "apply";
+              body = t("applySuccessBody");
+           }
+
+           return {
+              id: String(r.id),
+              type,
+              title,
+              body,
+              time: r.created_at || new Date().toISOString(),
+              read: true
+           };
+        });
         setNotifs(mapped);
       } catch (e) {
         console.warn(e);
@@ -116,9 +150,9 @@ export default function NotificationsScreen() {
         >
           <ChevronLeft size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 20, fontWeight: "900", color: colors.text, letterSpacing: -0.5 }}>Bot Activity</Text>
-        <TouchableOpacity style={{ padding: 8 }}>
-           <Text style={{ color: colors.primary, fontWeight: "800" }}>Clear</Text>
+        <Text style={{ fontSize: 20, fontWeight: "900", color: colors.text, letterSpacing: -0.5 }}>{t("botActivity")}</Text>
+        <TouchableOpacity style={{ padding: 8 }} onPress={() => setNotifs([])}>
+           <Text style={{ color: colors.primary, fontWeight: "800" }}>{t("clear")}</Text>
         </TouchableOpacity>
       </View>
 
@@ -132,9 +166,9 @@ export default function NotificationsScreen() {
                 source={{ uri: "file:///Users/habraham1/.gemini/antigravity/brain/52e227b3-cf14-4999-b6b4-e4a81b55467a/notification_hub_empty_1775078169152.png" }}
                 style={{ width: 280, height: 280, borderRadius: 40 }} 
              />
-             <Text style={{ color: colors.text, fontWeight: "900", fontSize: 22, marginTop: 24, letterSpacing: -0.5 }}>All caught up!</Text>
+             <Text style={{ color: colors.text, fontWeight: "900", fontSize: 22, marginTop: 24, letterSpacing: -0.5 }}>{t("allCaughtUp")}</Text>
              <Text style={{ color: colors.sub, textAlign: "center", marginTop: 8, fontSize: 15, lineHeight: 22 }}>
-                No active bot signals right now. Run discovery to see new updates here.
+                {t("noBotSignals")}
              </Text>
           </View>
         }

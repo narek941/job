@@ -33,4 +33,6 @@ export type JobRow = {
   cover_letter_path: string | null;
   applied_at: string | null;
   apply_status: string | null;
+  salary?: string | null;
+  created_at?: string | null;
 };

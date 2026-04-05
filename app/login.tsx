@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useAuth } from "../lib/auth";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { setLocale, t } from "../lib/i18n";
+import { useI18n } from "../lib/i18n";
 import { useTheme, DESIGN } from "../lib/theme";
 
 function formatApiError(e: unknown): string {
@@ -37,6 +37,7 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login, register } = useAuth();
   const router = useRouter();
+  const { t, setLocale } = useI18n();
   const [email, setEmail] = useState(__DEV__ ? "test@test.com" : "");
   const [password, setPassword] = useState(__DEV__ ? "TestPass123" : "");
   const [mode, setMode] = useState<"login" | "register">("login");

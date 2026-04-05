@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Alert, StyleSheet, Switch, View, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform } from "react-native";
 import { Text, TextInput, Button, Card, Surface, Divider } from "react-native-paper";
 import { useAuth } from "../lib/auth";
-import { setLocale } from "../lib/i18n";
+import { useI18n } from "../lib/i18n";
 import { useTheme } from "../lib/theme";
 import { 
   Globe, 
@@ -13,17 +13,24 @@ import {
   MessageCircle, 
   ShieldAlert, 
   LogOut,
-  ChevronLeft
+  ChevronLeft,
+  Mail,
+  SendHorizonal,
 } from "lucide-react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
   const { colors, isDark, setPreference, preference } = useTheme();
   const { api, logout } = useAuth();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { t, setLocale } = useI18n();
   
   const [queries, setQueries] = useState("software engineer, developer");
   const [telegram, setTelegram] = useState("");
+  const [applicationEmail, setApplicationEmail] = useState("");
+  const [loadingApproval, setLoadingApproval] = useState(false);
 
   const [alwaysDry, setAlwaysDry] = useState(true);
   const [resumeLang, setResumeLang] = useState("bilingual");
@@ -40,6 +47,8 @@ export default function SettingsScreen() {
              setResumeLang(res.data.resume_language ?? "bilingual");
              setCoverLang(res.data.cover_letter_language ?? "bilingual");
              setAutoPilot(res.data.auto_pilot ?? false);
+             setTelegram(res.data.telegram_chat_id ?? "");
+             setApplicationEmail(res.data.application_email ?? "");
           }
        } catch(e){}
     })();
@@ -95,20 +104,42 @@ export default function SettingsScreen() {
       resume_language: newResumeLang,
       cover_letter_language: newCoverLang,
       auto_pilot: newAutoPilot,
+      application_email: applicationEmail,
     });
   }
 
+  async function runApprovalPipeline() {
+    if (!applicationEmail.trim()) {
+      Alert.alert("Missing Email", "Enter the recipient email first.");
+      return;
+    }
+    try {
+      setLoadingApproval(true);
+      const { data } = await api.post("/pipeline/run-approval", {
+        min_score: 7,
+        max_jobs: 3,
+        recipient_email: applicationEmail.trim(),
+      });
+      Alert.alert("✅ Pipeline Started", `Sent ${data?.result?.sent ?? 0} approval request(s) to Telegram. Approve to send via Gmail.`);
+    } catch (e: any) {
+      Alert.alert("Error", String(e?.response?.data?.detail || e));
+    } finally {
+      setLoadingApproval(false);
+    }
+  }
+
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-      <ScrollView style={[styles.wrap, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingBottom: 60 }}>
-        <View style={styles.headerRow}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={{ paddingTop: insets.top + 10, paddingHorizontal: 20, zIndex: 10, backgroundColor: colors.bg, paddingBottom: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
           <TouchableOpacity onPress={() => router.back()} style={[styles.iconBtn, { backgroundColor: colors.card }]}>
             <ChevronLeft size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text variant="headlineMedium" style={{ fontWeight: "900", color: colors.text, marginLeft: 16 }}>Settings</Text>
+          <Text variant="headlineMedium" style={{ fontWeight: "900", color: colors.text, marginLeft: 16 }}>{t("settings")}</Text>
         </View>
-
-        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>Appearance</Text>
+      </View>
+      <ScrollView style={[styles.wrap, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingBottom: 60 }}>
+        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text, marginTop: 0 }]}>{t("appearance")}</Text>
         <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
           <Card.Content>
             <View style={styles.row}>
@@ -117,8 +148,8 @@ export default function SettingsScreen() {
                   {preference === "system" ? <Monitor size={20} color="#3b82f6" /> : (isDark ? <Moon size={20} color="#3b82f6" /> : <Sun size={20} color="#3b82f6" />)}
                 </View>
                 <View style={{ marginLeft: 12 }}>
-                  <Text style={{ color: colors.text, fontWeight: "bold" }}>Theme Preference</Text>
-                  <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>Currently {preference}</Text>
+                  <Text style={{ color: colors.text, fontWeight: "bold" }}>{t("themePref")}</Text>
+                  <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>{t("themeDesc")} {preference}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setPreference(isDark ? "light" : "dark")} style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
@@ -132,8 +163,8 @@ export default function SettingsScreen() {
                   <Globe size={20} color="#10b981" />
                 </View>
                 <View style={{ marginLeft: 12 }}>
-                  <Text style={{ color: colors.text, fontWeight: "bold" }}>Language (UI)</Text>
-                  <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>English / Հայերեն</Text>
+                  <Text style={{ color: colors.text, fontWeight: "bold" }}>{t("langUi")}</Text>
+                  <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>{t("langDesc")}</Text>
                 </View>
               </View>
               <View style={{ flexDirection: "row", gap: 8 }}>
@@ -148,18 +179,18 @@ export default function SettingsScreen() {
           </Card.Content>
         </Card>
 
-        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>Pipeline & Automation</Text>
+        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>{t("pipelineSec")}</Text>
         <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
           <Card.Content>
             <View style={styles.rowLeft}>
               <View style={[styles.iconBox, { backgroundColor: "rgba(139, 92, 246, 0.15)" }]}>
                 <Zap size={20} color="#8b5cf6" />
               </View>
-              <Text style={{ color: colors.text, fontWeight: "bold", marginLeft: 12 }}>Manual Triggers</Text>
+              <Text style={{ color: colors.text, fontWeight: "bold", marginLeft: 12 }}>{t("manualTriggers")}</Text>
             </View>
             
             <TextInput
-              label="Keywords (comma-separated)"
+              label={t("keywords")}
               mode="outlined"
               value={queries}
               onChangeText={setQueries}
@@ -176,7 +207,7 @@ export default function SettingsScreen() {
                 loading={loadingSearch}
                 style={{ flex: 1, borderRadius: 12 }}
               >
-                Discover Jobs
+                {t("discover")}
               </Button>
               <Button 
                 mode="outlined" 
@@ -185,13 +216,13 @@ export default function SettingsScreen() {
                 loading={loadingScore}
                 style={{ flex: 1, borderRadius: 12, borderColor: colors.border }}
               >
-                Score Match
+                {t("scoreMatch")}
               </Button>
             </View>
           </Card.Content>
         </Card>
 
-        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>Notifications</Text>
+        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>{t("notifications")}</Text>
         <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
           <Card.Content>
             <View style={styles.rowLeft}>
@@ -199,8 +230,8 @@ export default function SettingsScreen() {
                 <MessageCircle size={20} color="#38bdf8" />
               </View>
               <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "bold" }}>Telegram Bot</Text>
-                <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>Get alerts for new job matches via @userinfobot</Text>
+                <Text style={{ color: colors.text, fontWeight: "bold" }}>{t("telegramBot")}</Text>
+                <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>{t("telegramDesc")}</Text>
               </View>
             </View>
 
@@ -221,12 +252,53 @@ export default function SettingsScreen() {
               buttonColor={colors.primary} 
               style={{ marginTop: 16, borderRadius: 12 }}
             >
-              Save Telegram ID
+              {t("saveTelegram")}
             </Button>
           </Card.Content>
         </Card>
 
-        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>Safety & AI Settings</Text>
+        {/* Application Pipeline Card */}
+        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>Application Pipeline</Text>
+        <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
+          <Card.Content>
+            <View style={styles.rowLeft}>
+              <View style={[styles.iconBox, { backgroundColor: "rgba(16, 185, 129, 0.15)" }]}>
+                <Mail size={20} color="#10b981" />
+              </View>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ color: colors.text, fontWeight: "bold" }}>Gmail Recipient</Text>
+                <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>Email to send your application to</Text>
+              </View>
+            </View>
+
+            <TextInput
+              label="Recipient Email  (e.g. hr@company.am)"
+              mode="outlined"
+              value={applicationEmail}
+              onChangeText={setApplicationEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              textColor={colors.text}
+              style={{ backgroundColor: colors.bg, marginTop: 16 }}
+              theme={{ colors: { primary: colors.primary, onSurfaceVariant: colors.sub, outline: colors.border } }}
+            />
+
+            <Button
+              mode="contained"
+              onPress={runApprovalPipeline}
+              buttonColor="#10b981"
+              loading={loadingApproval}
+              style={{ marginTop: 16, borderRadius: 12 }}
+            >
+              Run Approval Pipeline
+            </Button>
+            <Text style={{ color: colors.sub, fontSize: 12, marginTop: 8, textAlign: "center" }}>
+              Scores jobs → tailors CV → Telegram approval → Gmail on ✅
+            </Text>
+          </Card.Content>
+        </Card>
+
+        <Text variant="titleMedium" style={[styles.sectionTitle, { color: colors.text }]}>{t("safety")}</Text>
         <Card style={[styles.card, { backgroundColor: colors.card }]} mode="elevated">
           <Card.Content>
             <View style={styles.row}>
@@ -235,8 +307,8 @@ export default function SettingsScreen() {
                   <ShieldAlert size={20} color="#f43f5e" />
                 </View>
                 <View style={{ marginLeft: 12 }}>
-                  <Text style={{ color: colors.text, fontWeight: "bold" }}>Always Dry-Run</Text>
-                  <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>Never apply automatically</Text>
+                  <Text style={{ color: colors.text, fontWeight: "bold" }}>{t("alwaysDry")}</Text>
+                  <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>{t("neverApply")}</Text>
                 </View>
               </View>
               <Switch value={alwaysDry} onValueChange={(v) => { setAlwaysDry(v); savePrefs(v, resumeLang, coverLang, autoPilot); }} trackColor={{ false: colors.border, true: colors.primary }} />
@@ -250,8 +322,8 @@ export default function SettingsScreen() {
                   <Zap size={20} color="#8b5cf6" />
                 </View>
                 <View style={{ marginLeft: 12 }}>
-                  <Text style={{ color: colors.text, fontWeight: "bold" }}>Daily Autopilot Bot</Text>
-                  <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>Run pipeline automatically</Text>
+                  <Text style={{ color: colors.text, fontWeight: "bold" }}>{t("dailyAuto")}</Text>
+                  <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>{t("runPipeline")}</Text>
                 </View>
               </View>
               <Switch value={autoPilot} onValueChange={(v) => { setAutoPilot(v); savePrefs(alwaysDry, resumeLang, coverLang, v); }} trackColor={{ false: colors.border, true: colors.primary }} />
@@ -261,8 +333,8 @@ export default function SettingsScreen() {
             
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.text, fontWeight: "bold" }}>Resume / Cover Language</Text>
-                <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>Generate in both EN / HY</Text>
+                <Text style={{ color: colors.text, fontWeight: "bold" }}>{t("resCovLang")}</Text>
+                <Text style={{ color: colors.sub, fontSize: 13, marginTop: 2 }}>{t("genBoth")}</Text>
               </View>
               <TouchableOpacity 
                 onPress={() => { setResumeLang("bilingual"); setCoverLang("bilingual"); savePrefs(alwaysDry, "bilingual", "bilingual", autoPilot); }}
@@ -276,7 +348,7 @@ export default function SettingsScreen() {
 
         <TouchableOpacity onPress={() => logout()} style={[styles.logoutBtn, { borderColor: colors.scoreLow, backgroundColor: colors.scoreLow + "15" }]}>
           <LogOut size={20} color={colors.scoreLow} />
-          <Text style={{ color: colors.scoreLow, fontWeight: "800", marginLeft: 8, fontSize: 16 }}>Log Out</Text>
+          <Text style={{ color: colors.scoreLow, fontWeight: "800", marginLeft: 8, fontSize: 16 }}>{t("logout")}</Text>
         </TouchableOpacity>
 
       </ScrollView>
